@@ -3,6 +3,8 @@
 
 #include "trackerwindow.h"
 #include "loadpackwidget.h"
+#include "communitypackwidget.h"
+#include "../packmanager/packmanager.h"
 #include "../uilib/progressbar.h"
 #include <vector>
 
@@ -11,8 +13,13 @@ namespace Ui {
 class DefaultTrackerWindow : public TrackerWindow {
 public:
     using FONT = Window::FONT;
+
+    enum class View {
+        LoadPackWidget,
+        CommunityPackWidget
+    };
     
-    DefaultTrackerWindow(const char *title, SDL_Surface* icon=nullptr, const Position& pos=WINDOW_DEFAULT_POSITION, const Size& size={0,0});
+    DefaultTrackerWindow(const char *title, SDL_Surface* icon=nullptr, const Position& pos=WINDOW_DEFAULT_POSITION, const Size& size={0,0}, const PackManager::PackMap* communityPacks=nullptr);
     virtual ~DefaultTrackerWindow();
 
     virtual void render(Renderer renderer, int offX, int offY) override;
@@ -20,12 +27,13 @@ public:
     virtual void setAutoTrackerState(int index, AutoTracker::State state, const std::string& name, const std::string& subname) override;
     virtual void setSize(Size size) override;
     void setMinSize(Size size) override;
-    virtual void showOpen();
-    virtual void hideOpen();
+    virtual void showView(View view);
+    virtual void hideView(View view);
     virtual void showProgress(const std::string& title, int progress, int max);
     virtual void hideProgress();
     
     Signal<const fs::path&, const std::string&> onPackSelected;
+    Signal<const std::string&> onDownloadPack;
     
 protected:
     ImageButton *_btnLoad = nullptr;
@@ -39,6 +47,7 @@ protected:
     Label *_lblTooltip = nullptr;
     Label *_lblMessage = nullptr;
     LoadPackWidget *_loadPackWidget = nullptr;
+    CommunityPackWidget *_communityPackWidget = nullptr;
     VBox *_vboxProgress = nullptr;
     HBox *_hboxProgressTexts = nullptr;
     Label *_lblProgressTitle = nullptr;

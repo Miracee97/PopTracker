@@ -32,6 +32,40 @@ LoadPackWidget::LoadPackWidget(int x, int y, int w, int h, FontStore *fontStore)
     variants->setPadding(0);
     variants->setSpacing(1);
     _variants = variants;
+
+    auto topBox = new VBox(0,0,0,0);
+    topBox->setGrow(1,0);
+    topBox->setPadding(2);
+    topBox->setSpacing(1);
+    topBox->setMinSize({0,32});
+    topBox->setBackground(TOP_BG_DEFAULT);
+    _topBox = topBox;
+
+    auto buttonContainer = new HBox(0, 0, 0, 0);
+    buttonContainer->setGrow(1, 0);
+    buttonContainer->setSpacing(2);
+    buttonContainer->setPadding(0);
+
+    auto communityLbl = new Label(0, 0, 0, 0, _font, " Community Packs ");
+    communityLbl->setGrow(0, 0);
+    communityLbl->setTextAlignment(Label::HAlign::CENTER, Label::VAlign::MIDDLE);
+    communityLbl->setMinSize({120, communityLbl->getAutoHeight()});
+    communityLbl->setSize({120, 28});
+    communityLbl->setBackground(BUTTON_BG_DEFAULT);
+    communityLbl->onMouseEnter += {this, [communityLbl](void*, int, int, unsigned) {
+        communityLbl->setBackground(BUTTON_BG_HOVER);
+    }};
+    communityLbl->onMouseLeave += {this, [communityLbl](void*) {
+        communityLbl->setBackground(BUTTON_BG_DEFAULT);
+    }};
+    communityLbl->onClick += {this, [this](void*, int, int, int button) {
+        if (button == MouseButton::BUTTON_LEFT) {
+            onSwitchToCommunityPacks.emit(this);
+        }
+    }};
+    buttonContainer->addChild(communityLbl);
+    
+    _topBox->addChild(buttonContainer);
     
     auto hbox = new HBox(0,0,0,0);
     hbox->setGrow(1,1);
@@ -39,8 +73,16 @@ LoadPackWidget::LoadPackWidget(int x, int y, int w, int h, FontStore *fontStore)
     hbox->addChild(variants);
     hbox->setSpacing(1);
     hbox->setPadding(2);
-    addChild(hbox);
-    _main = hbox;
+    
+    // Create main vertical container
+    auto mainVBox = new VBox(0,0,0,0);
+    mainVBox->setGrow(1,1);
+    mainVBox->addChild(topBox);
+    mainVBox->addChild(hbox);
+    mainVBox->setSpacing(1);
+    mainVBox->setPadding(0);
+    addChild(mainVBox);
+    _main = mainVBox;
 }
 
 void LoadPackWidget::update()
@@ -155,6 +197,7 @@ void LoadPackWidget::setSize(Size size)
 {
     SimpleContainer::setSize(size);
     // TODO: have more intelligent hbox instead
+    _topBox->setWidth(size.width);
     _packs->setWidth(size.width/2-1);
     _variants->setWidth(size.width/2-1);
     _main->relayout();

@@ -1,7 +1,6 @@
 #ifndef _PACKMANAGER_PACKMANAGER_H
 #define _PACKMANAGER_PACKMANAGER_H
 
-
 #include <nlohmann/json.hpp>
 #include <valijson/adapters/nlohmann_json_adapter.hpp>
 #include <valijson/schema.hpp>
@@ -9,6 +8,8 @@
 #include <valijson/validator.hpp>
 #include <map>
 #include <string>
+#include <optional>
+#include <vector>
 #include <functional>
 #include "../http/http.h"
 #include "../http/httpcache.h"
@@ -16,14 +17,81 @@
 #include "../core/signal.h"
 #include "../core/pack.h"
 
-
 class PackManager final : HTTPCache {
     typedef nlohmann::json json;
     typedef valijson::adapters::NlohmannJsonAdapter JsonSchemaAdapter;
+
 public:
     typedef std::function<void(const std::string&, const std::string&, const std::string&, const std::string&)> update_available_callback;
     typedef std::function<void(const std::string&)> no_update_available_callback;
     typedef std::function<void(std::string, std::function<void(bool)>)> confirmation_callback;
+
+    struct PackInfo {
+        std::string name;
+        std::string author;
+        std::string platform;
+        std::string homepage;
+        std::string versions_url;
+        std::string description;
+        std::optional<std::string> icon_url;
+        std::optional<std::vector<uint8_t>> icon_data;
+    };
+
+    struct PackVersion {
+        std::string package_version;
+        std::optional<std::string> download_url;
+        std::optional<std::string> sha256;
+        std::vector<std::string> changelog;
+    };
+
+    struct VersionInfo {
+        std::vector<PackVersion> versions;
+    };
+
+    inline friend void from_json(const nlohmann::json& j, PackInfo& p) {
+        j.at("name").get_to(p.name);
+        j.at("author").get_to(p.author);
+        j.at("platform").get_to(p.platform);
+        j.at("homepage").get_to(p.homepage);
+        j.at("versions_url").get_to(p.versions_url);
+        j.at("description").get_to(p.description);
+        if (j.contains("icon_url") && !j["icon_url"].is_null())
+            p.icon_url = j.at("icon_url").get<std::string>();
+        else
+            p.icon_url.reset();
+        if (j.contains("icon_data") && !j["icon_data"].is_null())
+            p.icon_data = j.at("icon_data").get<std::vector<uint8_t>>();
+        else
+            p.icon_data.reset();
+    }
+
+    inline friend void from_json(const nlohmann::json& j, PackVersion& v) {
+        j.at("package_version").get_to(v.package_version);
+
+        if (j.contains("download_url") && !j["download_url"].is_null())
+            v.download_url = j.at("download_url").get<std::string>();
+        else
+            v.download_url.reset();
+
+        if (j.contains("sha256") && !j["sha256"].is_null())
+            v.sha256 = j.at("sha256").get<std::string>();
+        else
+            v.sha256.reset();
+
+        if (j.contains("changelog") && j["changelog"].is_array())
+            v.changelog = j.at("changelog").get<std::vector<std::string>>();
+        else
+            v.changelog.clear();
+    }
+
+    inline friend void from_json(const nlohmann::json& j, VersionInfo& vi) {
+        if (j.contains("versions") && j["versions"].is_array())
+            vi.versions = j.at("versions").get<std::vector<PackVersion>>();
+        else
+            vi.versions.clear();
+    }
+
+    using PackMap = std::map<std::string, PackInfo>;
 
     PackManager(asio::io_service *asio, const fs::path& workdir, const std::list<std::string>& httpDefaultHeaders={});
     PackManager(const PackManager&) = delete;
@@ -52,6 +120,8 @@ public:
     }
 
     void getAvailablePacks(std::function<void(const json&)> cb);
+    void getCommunityVersion(const std::string& url, std::function<void(const VersionInfo&)> cb, bool alreadyModified=false);
+    void getIcon(const std::string& url, std::function<void(std::vector<uint8_t>)> cb);
     void ignoreUpdateSHA256(const std::string& uid, const std::string& sha256);
     void tempIgnoreSourceVersion(const std::string& uid, const std::string& version);
     void downloadUpdate(const std::string& url, const fs::path& install_dir,

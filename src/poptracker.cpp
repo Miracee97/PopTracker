@@ -550,9 +550,10 @@ bool PopTracker::start()
     
     // create main window
     auto icon = Ui::LoadImage(asset("icon.png"));
-    _win = _ui->createWindow<Ui::DefaultTrackerWindow>("PopTracker", icon, pos, size);
+    GetInstallablePacks(false); // get communitypack icons with true, not really working async rn as expected
+    _win = _ui->createWindow<Ui::DefaultTrackerWindow>("PopTracker", icon, pos, size, &communityPacks);
     SDL_FreeSurface(icon);
-	
+
 	// SDL2 default is to disable screensaver, enable it if preferred
     if (_config.value<bool>("enable_screensaver", true))
         SDL_EnableScreenSaver();
@@ -594,7 +595,8 @@ bool PopTracker::start()
         }
         if (item == Ui::TrackerWindow::MENU_LOAD)
         {
-            _win->showOpen();
+            _win->showView(Ui::DefaultTrackerWindow::View::LoadPackWidget);
+			_win->hideView(Ui::DefaultTrackerWindow::View::CommunityPackWidget);
         }
         if (item == Ui::TrackerWindow::MENU_RELOAD)
         {
@@ -730,7 +732,105 @@ bool PopTracker::start()
             fprintf(stderr, "Error scheduling load of tracker/pack!");
             // TODO: show error
         }
-        _win->hideOpen();
+        _win->hideView(Ui::DefaultTrackerWindow::View::LoadPackWidget);
+    }};
+
+    _win->onDownloadPack += {this, [this](void*, const std::string& url) {
+        bool done = false;
+        std::optional<PackManager::VersionInfo> packVersion;
+        _packManager->getCommunityVersion(url,[&done,&packVersion,this](const PackManager::VersionInfo& pV) {
+            done = true;
+            packVersion = pV;
+        });
+
+        while (!done) {
+            _asio->poll();
+        }
+
+		if (packVersion && !packVersion->versions.empty()) {
+
+            for (size_t i = 0; i < packVersion->versions.size(); ++i) {
+                auto& version = packVersion->versions[i];
+
+                if (!version.download_url) {
+                    continue;
+                }
+                const std::string url = version.download_url.value();
+
+                char* zipname = strrchr(url.c_str() + 8, '/');
+                if (!zipname)
+                continue;
+
+                zipname += 1;
+                std::filesystem::path path = getPackInstallDir() / fs::u8path(zipname);
+
+                if (fs::exists(path)) {
+                    if (!scheduleLoadTracker(path, "standard")) {
+                        fprintf(stderr, "Error scheduling load of tracker/pack!\n");
+                        // TODO: show error
+                    } else {
+                        _win->hideView(Ui::DefaultTrackerWindow::View::CommunityPackWidget);
+                        return; // stop at the first existing version handled
+                    }
+                }
+            }
+
+            auto& latestVersion = packVersion->versions.front();
+            if (latestVersion.download_url) {
+                const std::string url = *latestVersion.download_url;
+                // ask user to download and "install" pack
+                if (!HTTP::is_uri(url)) {
+                    fprintf(stderr, "Version URI is not valid!\n");
+                    return;
+                }
+
+                std::string msg = "Download pack from " + url + " ?";
+                if (Dlg::MsgBox("PopTracker", msg, Dlg::Buttons::YesNo, Dlg::Icon::Question) != Dlg::Result::Yes)
+                    return;
+
+
+
+                char* zipname = strrchr(url.c_str() + 8, '/');
+                if (!zipname) return;
+
+                zipname += 1;
+                auto path = getPackInstallDir() / fs::u8path(zipname);
+
+                // TODO: merge this with PackManager
+                std::string s;
+                auto requestHeaders = _httpDefaultHeaders;
+                if (HTTP::Get(url, s, requestHeaders) != HTTP::OK) {
+                    Dlg::MsgBox("PopTracker", "Error downloading file!", Dlg::Buttons::OK, Dlg::Icon::Error);
+                    return;
+                }
+                // default to %HOME%/PopTracker/packs if that exist, otherwise
+                // default to %APPDIR%/packs and fall back to %HOME%
+                // TODO: use PackManager::downloadUpdate
+
+                if (!writeFile(path, s)) {
+                    path = _homePackDir / fs::u8path(zipname);
+                    fs::create_directories(_homePackDir);
+                    errno = 0;
+                    if (!writeFile(path, s)) {
+                        std:: string msg = "Error saving file:\n";
+                        msg += strerror(errno);
+                        Dlg::MsgBox("PopTracker", msg, Dlg::Buttons::OK, Dlg::Icon::Error);
+                        return;
+                    }
+                }
+                printf("Download saved to %s\n", sanitize_print(path).c_str());
+                // attempt to load pack
+                if (!scheduleLoadTracker(path, "standard", false)) {
+                    fprintf(stderr, "Error scheduling load of tracker/pack!");
+                    // TODO: show error
+                } else {
+                    _win->hideView(Ui::DefaultTrackerWindow::View::CommunityPackWidget);
+                }
+            }
+        } else {
+            Dlg::MsgBox("PopTracker", "This Pack has a corrupted or wrong versions file, please inform the creator", Dlg::Buttons::OK, Dlg::Icon::Error);
+            return;
+        }
     }};
 
     _win->onDrop += {this, [this](void*, int, int, Ui::DropType type, const std::string& data) {
@@ -780,7 +880,8 @@ bool PopTracker::start()
             }
             // attempt to load pack
             if (!loadTracker(newPath, "standard", false)) {
-                _win->showOpen();
+                _win->showView(Ui::DefaultTrackerWindow::View::LoadPackWidget);
+				_win->hideView(Ui::DefaultTrackerWindow::View::CommunityPackWidget);
             }
         } else if (type == Ui::DropType::TEXT && strncasecmp(data.c_str(), "https://", 8)==0 && strcasecmp(data.c_str()+data.length()-4, ".zip") == 0) {
             // ask user to download and "install" pack
@@ -820,7 +921,8 @@ bool PopTracker::start()
             printf("Download saved to %s\n", sanitize_print(path).c_str());
             // attempt to load pack
             if (!loadTracker(path, "standard", false)) {
-                _win->showOpen();
+                _win->showView(Ui::DefaultTrackerWindow::View::LoadPackWidget);
+				_win->hideView(Ui::DefaultTrackerWindow::View::CommunityPackWidget);
             }
         }
     }};
@@ -1000,20 +1102,10 @@ bool PopTracker::frame()
 
 bool PopTracker::ListPacks(PackManager::confirmation_callback confirm, bool installable)
 {
-    json installablePacks;
     if (installable) {
-        printf("Fetching data...\n");
-        bool done = false;
         if (confirm) _packManager->setConfirmationHandler(confirm);
-        _packManager->getAvailablePacks([&done,&installablePacks](const json& j) {
-            done = true;
-            installablePacks = j;
-        });
-
-        while (!done) {
-            _asio->poll();
-        }
-
+        if (communityPacks.empty()) GetInstallablePacks();
+       
         printf("\n");
     }
 
@@ -1035,11 +1127,11 @@ bool PopTracker::ListPacks(PackManager::confirmation_callback confirm, bool inst
 
     if (installable) {
         printf("Installable packs:\n");
-        if (!installablePacks.is_object() || !installablePacks.size()) {
+        if (communityPacks.empty()) {
             printf("~ no packs in repositories ~\n");
         } else {
-            for (auto& pair: installablePacks.items()) {
-                printf("%s %s\n", pair.key().c_str(), pair.value()["name"].dump().c_str());
+            for (const auto& [uid, info] : communityPacks) {
+                printf("%s %s\n", uid.c_str(), info.name.c_str());
             }
         }
         printf("\n");
@@ -1081,6 +1173,23 @@ bool PopTracker::InstallPack(const std::string& uid, PackManager::confirmation_c
         _asio->poll();
     }
     return res;
+}
+
+void PopTracker::GetInstallablePacks(bool addIcons)
+{
+    printf("Fetching data...\n");
+    _packManager->getAvailablePacks([this, addIcons](const json& j) {
+        this->communityPacks = j.get<PackManager::PackMap>();
+        if (addIcons) {
+        for (auto& [packName, packInfo] : communityPacks) {
+            if (packInfo.icon_url) {
+                _packManager->getIcon(*packInfo.icon_url,[&packInfo](const std::vector<uint8_t>& icon) {
+                    packInfo.icon_data = icon;
+                });
+            }
+        }
+    }
+    });
 }
 
 const fs::path& PopTracker::getPackInstallDir() const

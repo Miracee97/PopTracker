@@ -87,13 +87,15 @@ public:
 
     bool ListPacks(PackManager::confirmation_callback confirm = nullptr, bool installable = true);
     bool InstallPack(const std::string& uid, PackManager::confirmation_callback confirm = nullptr);
-
+    void GetInstallablePacks(bool withIcons=false);
     static constexpr std::initializer_list<const char*> ALL_DEBUG_FLAGS = {"errors", "fps"};
 
     static constexpr const char APPNAME[] = "PopTracker";
     static constexpr const char VERSION_STRING[] = APP_VERSION_STRING;
     static const Version VERSION;
     static constexpr int AUTOSAVE_INTERVAL = 60; // 1 minute
+
+    PackManager::PackMap communityPacks;
 
 protected:
     virtual bool start();

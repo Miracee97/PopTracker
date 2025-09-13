@@ -5,7 +5,7 @@
 
 namespace Ui {
 
-DefaultTrackerWindow::DefaultTrackerWindow(const char* title, SDL_Surface* icon, const Position& pos, const Size& size)
+DefaultTrackerWindow::DefaultTrackerWindow(const char* title, SDL_Surface* icon, const Position& pos, const Size& size, const PackManager::PackMap* communityPacks)
     : TrackerWindow(title, icon, pos, size)
 {
     auto hbox = new HBox(0,0,_size.width,32);
@@ -92,7 +92,28 @@ DefaultTrackerWindow::DefaultTrackerWindow(const char* title, SDL_Surface* icon,
     _loadPackWidget->onPackSelected += {this,[this](void *, const fs::path& pack, const std::string& variant) {
         onPackSelected.emit(this,pack,variant);
     }};
+
+    _loadPackWidget->onSwitchToCommunityPacks += {this,[this](void *) {
+        showView(View::CommunityPackWidget);
+        hideView(View::LoadPackWidget);
+    }};
     
+    _communityPackWidget = new CommunityPackWidget(0,0,0,0,_fontStore,communityPacks);
+    _communityPackWidget->setPosition({0,0});
+    _communityPackWidget->setSize(_size);
+    _communityPackWidget->setBackground({0,0,0});
+    _communityPackWidget->setVisible(false);
+    addChild(_communityPackWidget);
+
+    _communityPackWidget->onSwitchToLoadPacks += {this,[this](void *) {
+        showView(View::LoadPackWidget);
+        hideView(View::CommunityPackWidget);
+    }};
+
+    _communityPackWidget->onDownloadPack += {this,[this](void *, const std::string& url) {
+        onDownloadPack.emit(this,url);
+    }};
+
     for (const auto& pair : {
             std::pair{_btnLoad, "Load Pack"},
             std::pair{_btnReload, "Reload Pack"},
@@ -322,6 +343,7 @@ void DefaultTrackerWindow::setSize(Size size)
     TrackerWindow::setSize(size);
     _lblMessage->setWidth(size.width);
     _loadPackWidget->setSize(size);
+    _communityPackWidget->setSize(size);
     if (_vboxProgress) {
         _vboxProgress->setPosition({
             (_size.width - _vboxProgress->getWidth())/2,
@@ -335,14 +357,32 @@ void DefaultTrackerWindow::setMinSize(const Size size)
     TrackerWindow::setMinSize(size || Size{220, 0});
 }
 
-void DefaultTrackerWindow::showOpen()
+void DefaultTrackerWindow::showView(View view)
 {
-    _loadPackWidget->update();
-    _loadPackWidget->setVisible(true);
+    switch (view) {
+        case View::LoadPackWidget:
+            _loadPackWidget->update();
+            _loadPackWidget->setVisible(true);
+            raiseChild(_loadPackWidget);
+            break;
+        case View::CommunityPackWidget:
+            _communityPackWidget->update();
+            _communityPackWidget->setVisible(true);
+            raiseChild(_communityPackWidget);
+            break;
+    }
 }
-void DefaultTrackerWindow::hideOpen()
+void DefaultTrackerWindow::hideView(View view)
 {
-    _loadPackWidget->setVisible(false);
+
+    switch (view) {
+        case View::LoadPackWidget:
+            _loadPackWidget->setVisible(false);
+            break;
+        case View::CommunityPackWidget:
+            _communityPackWidget->setVisible(false);
+            break;
+    }
 }
 
 void DefaultTrackerWindow::showProgress(const std::string& text, int progress, int max)

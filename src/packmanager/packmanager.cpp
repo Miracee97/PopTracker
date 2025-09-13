@@ -63,6 +63,39 @@ void PackManager::updateRepository(const std::string& url, std::function<void(bo
     });
 }
 
+void PackManager::getCommunityVersion(const std::string& url, std::function<void(const VersionInfo&)> cb, bool alreadyModified)
+{
+    GetCached(url, [this, url, cb, alreadyModified](bool ok, std::string data) {
+        if (ok) {
+            try {
+                auto j = json::parse(data);
+                valijson::Validator validator;
+                JsonSchemaAdapter jAdapter(j);
+                if (!validator.validate(_versionSchema, jAdapter, nullptr)) {
+                    throw std::runtime_error("Json validation failed");
+                }
+                try {
+                    cb(j.get<VersionInfo>());
+                } catch (const std::exception& e) {
+                    std::cerr << "Error parsing community version: " << e.what() << "\n";
+                }
+            } catch (...) {
+                printf("Invalid json from pack repository %s\n", url.c_str());
+            }
+        }
+    });
+}
+
+void PackManager::getIcon(const std::string& url, std::function<void(std::vector<uint8_t>)> cb)
+{
+    GetCached(url, [this, url, cb](bool ok, std::string data) {
+        if (ok) {
+            std::vector<uint8_t> bytes(data.begin(), data.end());
+            cb(bytes);
+        }
+    });
+}
+
 void PackManager::updateRepositories(std::function<void(bool)> cb)
 {
     auto first = _repositories.begin();
@@ -80,7 +113,7 @@ bool PackManager::checkForUpdate(const std::string& uid, const std::string& vers
         update_available_callback cb, no_update_available_callback ncb)
 {
     if (_tempIgnoredSourceVersion[uid].count(version)) {
-        printf("PackaManager: Skipping update check for %s %s\n",
+        printf("PackManager: Skipping update check for %s %s\n",
                 sanitize_print(uid).c_str(), sanitize_print(version).c_str());
         if (ncb) ncb(uid);
         return false;
