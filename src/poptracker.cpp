@@ -757,7 +757,7 @@ bool PopTracker::start()
                 }
                 const std::string url = version.download_url.value();
 
-                char* zipname = strrchr(url.c_str() + 8, '/');
+                const char* zipname = strrchr(url.c_str() + 8, '/');
                 if (!zipname)
                 continue;
 
@@ -790,7 +790,7 @@ bool PopTracker::start()
 
 
 
-                char* zipname = strrchr(url.c_str() + 8, '/');
+                const char* zipname = strrchr(url.c_str() + 8, '/');
                 if (!zipname) return;
 
                 zipname += 1;
