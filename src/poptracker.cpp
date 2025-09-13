@@ -738,7 +738,7 @@ bool PopTracker::start()
     _win->onDownloadPack += {this, [this](void*, const std::string& url) {
         bool done = false;
         std::optional<PackManager::VersionInfo> packVersion;
-        _packManager->getCommunityVersion(url,[&done,&packVersion,this](const PackManager::VersionInfo& pV) {
+        _packManager->getCommunityVersion(url,[&done,&packVersion](const PackManager::VersionInfo& pV) {
             done = true;
             packVersion = pV;
         });

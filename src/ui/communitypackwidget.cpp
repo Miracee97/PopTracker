@@ -132,7 +132,7 @@ void CommunityPackWidget::addPacks()
 
         _packs->addChild(row);
 
-        lbl->onMouseEnter += {this, [this, &pack](void* s, int, int, unsigned) {
+        lbl->onMouseEnter += {this, [this](void* s, int, int, unsigned) {
             if (_curPackHover != s) {
                 if (_curPackHover == _curPackLabel && _disableHoverSelect)
                     _curPackHover->setBackground(PACK_BG_ACTIVE);
