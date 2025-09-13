@@ -762,7 +762,7 @@ bool PopTracker::start()
                 continue;
 
                 zipname += 1;
-                std::filesystem::path path = getPackInstallDir() / fs::u8path(zipname);
+                fs::path path = getPackInstallDir() / fs::u8path(zipname);
 
                 if (fs::exists(path)) {
                     if (!scheduleLoadTracker(path, "standard")) {
