@@ -63,9 +63,9 @@ void PackManager::updateRepository(const std::string& url, std::function<void(bo
     });
 }
 
-void PackManager::getCommunityVersion(const std::string& url, std::function<void(const VersionInfo&)> cb, bool alreadyModified)
+void PackManager::getCommunityVersion(const std::string& url, std::function<void(const VersionInfo&)> cb)
 {
-    GetCached(url, [this, url, cb, alreadyModified](bool ok, std::string data) {
+    GetCached(url, [this, url, cb](bool ok, std::string data) {
         if (ok) {
             try {
                 auto j = json::parse(data);
@@ -88,7 +88,7 @@ void PackManager::getCommunityVersion(const std::string& url, std::function<void
 
 void PackManager::getIcon(const std::string& url, std::function<void(std::vector<uint8_t>)> cb)
 {
-    GetCached(url, [this, url, cb](bool ok, std::string data) {
+    GetCached(url, [url, cb](bool ok, std::string data) {
         if (ok) {
             std::vector<uint8_t> bytes(data.begin(), data.end());
             cb(bytes);

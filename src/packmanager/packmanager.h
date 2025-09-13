@@ -120,7 +120,7 @@ public:
     }
 
     void getAvailablePacks(std::function<void(const json&)> cb);
-    void getCommunityVersion(const std::string& url, std::function<void(const VersionInfo&)> cb, bool alreadyModified=false);
+    void getCommunityVersion(const std::string& url, std::function<void(const VersionInfo&)> cb);
     void getIcon(const std::string& url, std::function<void(std::vector<uint8_t>)> cb);
     void ignoreUpdateSHA256(const std::string& uid, const std::string& sha256);
     void tempIgnoreSourceVersion(const std::string& uid, const std::string& version);
