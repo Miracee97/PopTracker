@@ -10,10 +10,11 @@
 
 namespace Ui {
 
-CommunityPackWidget::CommunityPackWidget(int x, int y, int w, int h, FontStore *fontStore, const PackManager::PackMap* communityPacks)
-        : SimpleContainer(x,y,w,h), _fontStore(fontStore)
+CommunityPackWidget::CommunityPackWidget(int x, int y, int w, int h, FontStore *fontStore, const PackManager::PackMap& communityPacks)
+        : SimpleContainer(x,y,w,h),
+          _fontStore(fontStore),
+          _communityPacks(communityPacks)
 {
-    _communityPacks = communityPacks;
     _font = _fontStore->getFont(DEFAULT_FONT_NAME, DEFAULT_FONT_SIZE);
     _smallFont = _fontStore->getFont(DEFAULT_FONT_NAME, DEFAULT_FONT_SIZE - 2);
     if (_font && !_smallFont) _smallFont = _font;
@@ -81,7 +82,7 @@ CommunityPackWidget::CommunityPackWidget(int x, int y, int w, int h, FontStore *
 
     addPacks();
 
-    if (_communityPacks->empty()) {
+    if (_communityPacks.empty()) {
         auto lbl = new Label(0, 0, 0, 0, _font, "No Community Packs available");
         lbl->setGrow(1,1);
         lbl->setTextAlignment(Label::HAlign::LEFT, Label::VAlign::MIDDLE);
@@ -109,8 +110,8 @@ void CommunityPackWidget::update()
 
 void CommunityPackWidget::addPacks()
 {
-    for (const auto& pair : *_communityPacks) {
-        const auto& pack = pair.second;
+    for (const auto& pair : _communityPacks) {
+        const PackManager::PackInfo& pack = pair.second;
 
         auto row = new HBox(0, 0, 0, 32);
         row->setSpacing(5);
@@ -131,7 +132,7 @@ void CommunityPackWidget::addPacks()
 
         _packs->addChild(row);
 
-        lbl->onMouseEnter += {this,[this,&pack](void* s, int, int, unsigned) {
+        lbl->onMouseEnter += {this, [this, &pack](void* s, int, int, unsigned) {
             if (_curPackHover != s) {
                 if (_curPackHover == _curPackLabel && _disableHoverSelect)
                     _curPackHover->setBackground(PACK_BG_ACTIVE);
@@ -153,15 +154,14 @@ void CommunityPackWidget::addPacks()
             _curPackLabel = (Label*)s;
         }};
 
-        auto url = pack.versions_url;
-        lbl->onClick += {this, [this,url](void* s, int x, int y, int buttons) {
+        lbl->onClick += {this, [this, pack](void* s, int x, int y, int buttons) {
             _disableHoverSelect = false;
             ((Label*)s)->onMouseEnter.emit(s, x, y, (unsigned)buttons);
             _disableHoverSelect = true;
             if (_curPackLabel)
                 _curPackLabel->setBackground(PACK_BG_ACTIVE_HOVER);
 
-            onDownloadPack.emit(this,url);
+            onDownloadPack.emit(this, pack.versions_url);
         }};
     }
 }

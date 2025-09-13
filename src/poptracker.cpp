@@ -551,7 +551,7 @@ bool PopTracker::start()
     // create main window
     auto icon = Ui::LoadImage(asset("icon.png"));
     GetInstallablePacks(false); // get communitypack icons with true, not really working async rn as expected
-    _win = _ui->createWindow<Ui::DefaultTrackerWindow>("PopTracker", icon, pos, size, &communityPacks);
+    _win = _ui->createWindow<Ui::DefaultTrackerWindow>("PopTracker", icon, pos, size, communityPacks);
     SDL_FreeSurface(icon);
 
 	// SDL2 default is to disable screensaver, enable it if preferred
@@ -1181,14 +1181,15 @@ void PopTracker::GetInstallablePacks(bool addIcons)
     _packManager->getAvailablePacks([this, addIcons](const json& j) {
         this->communityPacks = j.get<PackManager::PackMap>();
         if (addIcons) {
-        for (auto& [packName, packInfo] : communityPacks) {
-            if (packInfo.icon_url) {
-                _packManager->getIcon(*packInfo.icon_url,[&packInfo](const std::vector<uint8_t>& icon) {
-                    packInfo.icon_data = icon;
-                });
+            for (auto& entry : communityPacks) {
+                auto& packInfo = entry.second;
+                if (packInfo.icon_url) {
+                    _packManager->getIcon(*packInfo.icon_url,[&packInfo](const std::vector<uint8_t>& icon) {
+                        packInfo.icon_data = icon;
+                    });
+                }
             }
         }
-    }
     });
 }
 

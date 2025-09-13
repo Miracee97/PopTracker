@@ -5,7 +5,7 @@
 
 namespace Ui {
 
-DefaultTrackerWindow::DefaultTrackerWindow(const char* title, SDL_Surface* icon, const Position& pos, const Size& size, const PackManager::PackMap* communityPacks)
+DefaultTrackerWindow::DefaultTrackerWindow(const char* title, SDL_Surface* icon, const Position& pos, const Size& size, const PackManager::PackMap& communityPacks)
     : TrackerWindow(title, icon, pos, size)
 {
     auto hbox = new HBox(0,0,_size.width,32);

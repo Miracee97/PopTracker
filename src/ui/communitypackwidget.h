@@ -19,7 +19,7 @@ namespace Ui {
 class CommunityPackWidget : public SimpleContainer {
 public:
     using FONT = FontStore::FONT;
-    CommunityPackWidget(int x, int y, int w, int h, FontStore *fontStore, const PackManager::PackMap* communityPacks);
+    CommunityPackWidget(int x, int y, int w, int h, FontStore *fontStore, const PackManager::PackMap& communityPacks);
 
     void update();
 
@@ -43,7 +43,7 @@ protected:
     bool _disableHoverSelect = false;
     bool _packIconsAdded = false;
 
-    const PackManager::PackMap* _communityPacks;
+    const PackManager::PackMap& _communityPacks;
 
     static constexpr Color PACK_BG_DEFAULT = {32, 32, 32};
     static constexpr Color PACK_BG_ACTIVE = {32, 128, 32};
