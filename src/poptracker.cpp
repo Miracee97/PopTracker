@@ -1177,20 +1177,36 @@ bool PopTracker::InstallPack(const std::string& uid, PackManager::confirmation_c
 
 void PopTracker::GetInstallablePacks(bool addIcons)
 {
-    printf("Fetching data...\n");
-    _packManager->getAvailablePacks([this, addIcons](const json& j) {
+    std::cout << "Fetching data...\n";
+
+    bool done = false;
+
+    _packManager->getAvailablePacks([this, addIcons, &done](const json& j) {
         this->communityPacks = j.get<PackManager::PackMap>();
+
         if (addIcons) {
             for (auto& entry : communityPacks) {
                 auto& packInfo = entry.second;
                 if (packInfo.icon_url) {
-                    _packManager->getIcon(*packInfo.icon_url,[&packInfo](const std::vector<uint8_t>& icon) {
-                        packInfo.icon_data = icon;
-                    });
+                    bool iconDone = false;
+                    _packManager->getIcon(*packInfo.icon_url,
+                        [&packInfo, &iconDone](const std::vector<uint8_t>& icon) {
+                            packInfo.icon_data = icon;
+                            iconDone = true;
+                        });
+
+                    while (!iconDone) {
+                        _asio->poll();
+                    }
                 }
             }
         }
+
+        done = true;
     });
+    while (!done) {
+        _asio->poll();
+    }
 }
 
 const fs::path& PopTracker::getPackInstallDir() const
