@@ -154,14 +154,17 @@ void CommunityPackWidget::addPacks()
             _curPackLabel = (Label*)s;
         }};
 
-        lbl->onClick += {this, [this, pack](void* s, int x, int y, int buttons) {
+        lbl->onClick += {this, [this, pack](void* s, int x, int y, int button) {
             _disableHoverSelect = false;
-            ((Label*)s)->onMouseEnter.emit(s, x, y, (unsigned)buttons);
+            ((Label*)s)->onMouseEnter.emit(s, x, y, (unsigned)button);
             _disableHoverSelect = true;
             if (_curPackLabel)
                 _curPackLabel->setBackground(PACK_BG_ACTIVE_HOVER);
-
-            onDownloadPack.emit(this, pack.versions_url);
+            if (button == MouseButton::BUTTON_LEFT) {
+                onDownloadPack.emit(this, pack.versions_url);
+            } else if (button == MouseButton::BUTTON_MIDDLE && !pack.homepage.empty()) {
+                onOpenUrl.emit(this, pack.homepage);
+            }
         }};
     }
 }

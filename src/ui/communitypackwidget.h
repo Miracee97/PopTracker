@@ -26,6 +26,7 @@ public:
     Signal<const fs::path&, const std::string&> onPackSelected;
     Signal<> onSwitchToLoadPacks;
     Signal<const std::string&> onDownloadPack;
+    Signal<const std::string&> onOpenUrl;
 
     virtual void setSize(Size size) override; // TODO: have more intelligent hbox instead
 

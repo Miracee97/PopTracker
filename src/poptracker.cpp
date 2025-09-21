@@ -833,6 +833,30 @@ bool PopTracker::start()
         }
     }};
 
+    _win->onOpenUrl += {this, [this](void*, const std::string& url) {
+#ifdef _WIN32
+        ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
+#elif __APPLE__
+        pid_t pid = fork();
+        if (pid == 0) {
+            execlp("open", "open", url.c_str(), (char*)NULL);
+            _exit(1); // if execlp fails
+        } else if (pid > 0) {
+            waitpid(pid, nullptr, 0);
+        }
+#elif __linux__
+        pid_t pid = fork();
+        if (pid == 0) {
+            execlp("xdg-open", "xdg-open", url.c_str(), (char*)NULL);
+            _exit(1); // if execlp fails
+        } else if (pid > 0) {
+            waitpid(pid, nullptr, 0);
+        }
+#else
+        std::cerr << "Unsupported OS" << std::endl;
+#endif
+    }};
+
     _win->onDrop += {this, [this](void*, int, int, Ui::DropType type, const std::string& data) {
         if (type == Ui::DropType::FILE && data.length()>=5 && strcasecmp(data.c_str()+data.length()-5, ".json") == 0) {
             loadState(data);

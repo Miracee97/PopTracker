@@ -34,6 +34,7 @@ public:
     
     Signal<const fs::path&, const std::string&> onPackSelected;
     Signal<const std::string&> onDownloadPack;
+    Signal<const std::string&> onOpenUrl;
     
 protected:
     ImageButton *_btnLoad = nullptr;

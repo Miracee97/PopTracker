@@ -114,6 +114,10 @@ DefaultTrackerWindow::DefaultTrackerWindow(const char* title, SDL_Surface* icon,
         onDownloadPack.emit(this,url);
     }};
 
+    _communityPackWidget->onOpenUrl += {this,[this](void *, const std::string& url) {
+        onOpenUrl.emit(this,url);
+    }};
+
     for (const auto& pair : {
             std::pair{_btnLoad, "Load Pack"},
             std::pair{_btnReload, "Reload Pack"},
