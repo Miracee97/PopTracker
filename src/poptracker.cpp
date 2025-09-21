@@ -833,7 +833,7 @@ bool PopTracker::start()
         }
     }};
 
-    _win->onOpenUrl += {this, [this](void*, const std::string& url) {
+    _win->onOpenUrl += {this, [](void*, const std::string& url) {
 #ifdef _WIN32
         ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
 #elif __APPLE__
