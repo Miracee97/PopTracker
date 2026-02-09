@@ -78,6 +78,7 @@ Configures behavior of the pack.
         "smooth_scaling": true|false|null, // configure the image scaling method. null = default = currently crisp
         "smooth_map_scaling": true|false|null, // configure the image scaling method for maps. null = default = smooth
         "allow_deferred_logic_update": true|false|null, // set initial value of Tracker.AllowDeferredLogicUpdate
+        "disabled_image_filter": "...", // set the meaning of @disabled in img_mods, defaults to "grey", since 0.33.0
     }
 
 NOTE: User overrides for settings are merged with the pack, replacing individual keys, not the whole file.
@@ -134,7 +135,8 @@ The following interfaces are provided:
 * `ref :AddOnFrameHandler(name,callback)`: callback(elapsed) will be called every frame, available since 0.25.9
 * `bool :RemoveOnFrameHandler(name)`: remove a frame callback
 * `ref :AddOnLocationSectionChangedHandler(name, callback)`: callback (LocationSection) will be called whenever any location section changes, available since 0.26.2
-* `bool :RemoveOnLocationSectionChangedHandler(name)`: removes a previously added LocationSectionChanged callback, available since 0.26.2
+* `bool :RemoveOnLocationSectionChangedHandler(name)`: removes a previously added LocationSectionChanged callback, available since 0.33.1
+* `bool :RemoveOnLocationSectionHandler(name)`: Old name of RemoveOnLocationSectionChangedHandler, available since 0.26.2
 * `ThreadProxy :RunScriptAsync(luaFilename, arg, completeCallback, progressCallback)`: Load and run script in a separate thread. `arg` is passed as global arg. Most other things are not available in the new context. Use `return` to return a value from the script, that will be passed to `callback(result)`. (ThreadProxy has no function yet)
 * `ThreadProxy :RunStringAsync(script, arg, completeCallback, progressCallback)`: same as RunScriptAsync, but script is a string instead of a filename.
 * `void :AsyncProgress(arg)`: call progressCallback in main context on next frame. Arg is passed to callback.
@@ -231,7 +233,7 @@ a table representing an enum with the following constants: \
 * `.Type`: gets the type of the item as string ("toggle", ...), since 0.23.0
 * `.Icon`: override displayed image, including mods, until state changes, since 0.26.2. Prefer stages instead.
 * `.BadgeText`: same as SetOverlay, but a property, since 0.31.0
-* `.BadgeTextColor`: same as SetOverlay, but a property, since 0.31.0
+* `.BadgeTextColor`: same as SetOverlayColor, but a property, since 0.31.0
 
 *Probably more to come.*
 
@@ -284,8 +286,14 @@ a table representing an enum with the following constants: \
         ]
     
   + img_mods filter to be applied on the img
-    - `@disabled`: grey-scale
+    - `@disabled`: as defined in `settings.json`'s "disabled_image_filter"; defaults to `grey`
+    - `grey`: 0% saturation + 67% brightness
+    - `disable`: same as `grey`
     - `overlay|path/to/img.png|overlay_filters...`: draw a second image over it; overlay_filters are applied to overlay (since 0.25.6)
+    - `brightness|x`: set image brightness by multiplying all colors with `x` (decimal); since 0.32.2
+    - `dim`: same as `brightness|0.5`; since 0.32.2
+    - `saturation|x|colorspace`: set saturation to `x`, if colorspace is `bt601` emulate brightness levels, otherwise average r, g, b; since 0.32.2
+    - `greyscale`: same as `saturation|0`; since 0.32.2
     - NOTE: order matters, applied left to right
   + inherit_codes: true will make stage3 provide codes for item, stage1, 2 and 3 (default true)
 
@@ -465,6 +473,8 @@ Rules starting with `^` interpret the value as AccessibilityLevel instead of cou
 
 For `$` rules, arguments can be supplied with `|`. `$test|a|b` will call `test("a","b")`.
 The return value has to be a number (count) or boolean (since v0.20.4).
+
+Rules containing a `:` will check the count instead of boolean. `<rule>:<count>` can be used with `$` rules and item codes (e.g. consumables) but will have no effect for `^` and `@` rules
 
 Rules inside `[` `]` are optional (i.e. glitches work around this rule).
 

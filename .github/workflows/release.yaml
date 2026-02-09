@@ -10,6 +10,21 @@ permissions:
   attestations: 'write'
   contents: 'write'
 
+env:
+  APPIMAGE_BUILDER_URL: 'https://github.com/AppImageCrafters/appimage-builder/releases/download/v1.1.0/appimage-builder-1.1.0-x86_64.AppImage'
+  APPIMAGE_BUILDER_HASH: '4b4f99cae9291d78ba12dbdabca7c0a67c72aa61eb2e5d424089171a9485e96f'
+  APPIMAGETOOL_URL: 'https://github.com/PopTracker/appimagetool/releases/download/r-2025-11-18/appimagetool-x86_64.AppImage'
+  APPIMAGETOOL_HASH: '4577a452b30af2337123fbb383aea154b618e51ad5448c3b62085cbbbfbfd9a2'
+  APPIMAGE_RUNTIME_URL: 'https://github.com/PopTracker/type2-runtime/releases/download/r-2025-11-07/runtime-x86_64'
+  APPIMAGE_RUNTIME_HASH: '27ddd3f78e483fc5f7856e413d7c17092917f8c35bfe3318a0d378aa9435ad17'
+  APPIMAGE_RUNTIME_NAME: 'runtime-x86_64'
+  APPRUN_URL: 'https://github.com/AppImageCrafters/AppRun/releases/download/v2.0.0/AppRun-Debug-x86_64'
+  APPRUN_HASH: 'b19b10ffe0f0e1af7344a6d733d95a1097c00ee5730cb17c97bdfd6c409d80a5'
+  APPRUN_NAME: 'AppRun-Release-x86_64'
+  APPRUN_HOOKS_URL: 'https://github.com/AppImageCrafters/AppRun/releases/download/v2.0.0/libapprun_hooks-Release-x86_64.so'
+  APPRUN_HOOKS_HASH: '1f64dd2161be3242f106c891b2daf27bbdd2103c20b28f57f61a56cdccb1eb6a'
+  APPRUN_HOOKS_NAME: 'libapprun_hooks-Release-x86_64.so'
+
 jobs:
   release-main:
     runs-on: ubuntu-latest
@@ -17,7 +32,7 @@ jobs:
     steps:
     - name: Set env
       run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6.0.2
       with:
         submodules: recursive
     - name: Package source
@@ -46,7 +61,7 @@ jobs:
       run: |
         sudo apt-get update -y -qq
         sudo apt-get install coreutils build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev p7zip wget libgtest-dev libgmock-dev
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6.0.2
       with:
         submodules: recursive
     - name: Set env
@@ -54,17 +69,58 @@ jobs:
     - name: Set version
       run: |
         sed -i "s/version: latest/version: ${{ env.RELEASE_VERSION }}/g" linux/AppImageBuilder.yml
-    - name: Get appimage-builder
+    - name: Get appimage-builder, appimagetool, runtime, AppRun and hooks
       run: |
-        wget -q -O appimage-builder https://github.com/AppImageCrafters/appimage-builder/releases/download/v1.1.0/appimage-builder-1.1.0-x86_64.AppImage
+        # download appimage-builder
+        wget -q -O appimage-builder "$APPIMAGE_BUILDER_URL"
+        echo "$APPIMAGE_BUILDER_HASH appimage-builder" | sha256sum -c
         chmod +x appimage-builder
-        ./appimage-builder --appimage-extract
-        echo -e '#/bin/sh\n./squashfs-root/AppRun "$@"' > appimage-builder
-    - name: Build AppImage
+
+        # download appimagetool
+        wget -q -O appimagetool "$APPIMAGETOOL_URL"
+        echo "$APPIMAGETOOL_HASH appimagetool" | sha256sum -c
+        chmod +x appimagetool
+
+        # download specific runtime
+        mkdir -p appimage-build/prime
+        wget -q -O "appimage-build/prime/$APPIMAGE_RUNTIME_NAME" "$APPIMAGE_RUNTIME_URL"
+        echo "$APPIMAGE_RUNTIME_HASH appimage-build/prime/$APPIMAGE_RUNTIME_NAME" | sha256sum -c
+
+        # download specific AppRun
+        mkdir -p appimage-build/AppRun/v2.0.0
+        wget -q -O "appimage-build/AppRun/v2.0.0/$APPRUN_NAME" "$APPRUN_URL"
+        echo "$APPRUN_HASH appimage-build/AppRun/v2.0.0/$APPRUN_NAME" | sha256sum -c
+        wget -q -O "appimage-build/AppRun/v2.0.0/$APPRUN_HOOKS_NAME" "$APPRUN_HOOKS_URL"
+        echo "$APPRUN_HOOKS_HASH appimage-build/AppRun/v2.0.0/$APPRUN_HOOKS_NAME" | sha256sum -c
+    - name: Build AppDir
       run: |
-        ./appimage-builder --recipe linux/AppImageBuilder.yml
+        # build AppDir
+        ./appimage-builder --appimage-extract-and-run --skip-appimage --recipe linux/AppImageBuilder.yml
+
+        # verify we have not accidentally downloaded another runtime
+        echo "$APPIMAGE_RUNTIME_HASH appimage-build/prime/$APPIMAGE_RUNTIME_NAME" | sha256sum -c
+        [ "$(ls -1q appimage-build/prime/ | wc -l)" == "1" ] || exit 1
+
+        # verify we have not accidentally downloaded another AppRun
+        echo "$APPRUN_HASH appimage-build/AppRun/v2.0.0/$APPRUN_NAME" | sha256sum -c
+        echo "$APPRUN_HOOKS_HASH appimage-build/AppRun/v2.0.0/$APPRUN_HOOKS_NAME" | sha256sum -c
+        [ "$(ls -1q appimage-build/AppRun/ | wc -l)" == "1" ] || exit 1
+        [ "$(ls -1q appimage-build/AppRun/v2.0.0/ | wc -l)" == "2" ] || exit 1
+    - name: Build AppImage
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # currently required to automatically get update info
+      run: |
+        # extract recipe version for appimagetool
+        export VERSION=$(cat linux/AppImageBuilder.yml \
+          | sed -n '/AppDir:/,$p' \
+          | sed -nr 's/\s*version:\s*(.*)/\1/p' \
+          | head -n 1)
+        # package AppDir into AppImage with appimagetool
+        ./appimagetool --appimage-extract-and-run \
+          -g --runtime-file "appimage-build/prime/$APPIMAGE_RUNTIME_NAME" \
+          AppDir
     - name: Attest Build, AppImage and zsync
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f
       with:
         subject-path: |
           appimage-build/linux-x86_64/poptracker
@@ -88,7 +144,7 @@ jobs:
       run: |
         sudo apt-get update -y -qq
         sudo apt-get install coreutils build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev p7zip wget libgtest-dev libgmock-dev
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6.0.2
       with:
         submodules: recursive
     - name: Set env
@@ -100,7 +156,7 @@ jobs:
     - name: Build DIST # this builds a .tar.xz
       run: make CONF=DIST VERSION=${{ env.RELEASE_VERSION }}
     - name: Attest Build and Archive
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f
       with:
         subject-path: |
           build/linux-x86_64/poptracker
@@ -117,13 +173,13 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-macos:
-    runs-on: macos-13
+    runs-on: macos-15-intel
 
     steps:
     - name: Install dependencies
       run: |
         brew install coreutils SDL2 sdl2_ttf sdl2_image openssl@3.0 automake libtool autoconf googletest || true
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6.0.2
       with:
         submodules: recursive
     - name: Set env
@@ -135,7 +191,7 @@ jobs:
     - name: Build DIST # this builds the app bundle, zips it and maybe .dmg in the future
       run: make CONF=DIST VERSION=${{ env.RELEASE_VERSION }}
     - name: Attest Build and AppBundle
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f
       with:
         subject-path: |
           build/darwin-x86_64/poptracker.app/Contents/MacOS/poptracker
@@ -172,8 +228,9 @@ jobs:
           mingw64/mingw-w64-x86_64-openssl
           mingw64/mingw-w64-x86_64-gtest
           p7zip
+          wget
           mingw-w64-x86_64-advancecomp
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6.0.2
       with:
         submodules: recursive
     - name: Build libs
@@ -195,11 +252,23 @@ jobs:
     - name: Run tests
       shell: msys2 {0}
       run: make test CONF=RELEASE VERSION=${{ env.RELEASE_VERSION }}
+    - name: Download Updater
+      shell: msys2 {0}
+      env:
+        UPDATER_VERSION: 'v0.2.0'
+        UPDATER_OS: ${{ runner.os }}
+        UPDATER_ARCH: ${{ runner.arch }}
+        UPDATER_ZIP_HASH: 'b67945e229c05e15eee4665b145921cfa20d4a9605bc41f936ad38143bb57285'
+      run: |
+        wget -O updater.zip \
+          "https://github.com/black-sliver/PopUpdater/releases/download/${UPDATER_VERSION}/PopUpdater_${UPDATER_VERSION}_${UPDATER_OS}-${UPDATER_ARCH}.zip"
+        echo "${UPDATER_ZIP_HASH} updater.zip" | sha256sum -c
+        7z e -obuild/win64 updater.zip
     - name: Build DIST # this builds the app bundle, zips it and maybe .dmg in the future
       shell: msys2 {0}
       run: make CONF=DIST VERSION=${{ env.RELEASE_VERSION }}
     - name: Attest Build and Archive
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f
       with:
         subject-path: |
           build/win64/poptracker.exe

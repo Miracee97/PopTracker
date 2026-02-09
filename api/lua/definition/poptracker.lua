@@ -20,7 +20,7 @@
 
 ---Currently running PopTracker version as string "x.y.z".
 ---@type string
-PopVersion = "0.32.0"
+PopVersion = "0.33.1"
 -- Actual value comes from the program, not from here, but try to keep in sync with API version here.
 
 ---Set to true or an array of strings to get more error or debug output.
@@ -208,8 +208,18 @@ function ScriptHost:RemoveOnFrameHandler(name) end
 ---@return string reference for RemoveOnLocationSectionChangedHandler
 function ScriptHost:AddOnLocationSectionChangedHandler(name, callback) end
 
----Remove a handler/callback added by AddOnLocationSectionChangedHandler.
+---Old name of RemoveOnLocationSectionChangedHandler.
 ---Available since 0.26.2.
+---Use RemoveOnLocationSectionChangedHandler instead if you support only PopTracker >= 0.33.1.
+---@see ScriptHost.RemoveOnLocationSectionChangedHandler
+---@param name string identifier/name of the handler to remove
+---@return boolean true on success
+function ScriptHost:RemoveOnLocationSectionHandler(name) end
+
+---Remove a handler/callback added by AddOnLocationSectionChangedHandler.
+---Available since 0.33.1.
+---Use RemoveOnLocationSectionHandler instead if you support PopTracker < 0.33.1.
+---@see ScriptHost.RemoveOnLocationSectionHandler
 ---@param name string identifier/name of the handler to remove
 ---@return boolean true on success
 function ScriptHost:RemoveOnLocationSectionChangedHandler(name) end
@@ -342,6 +352,11 @@ Archipelago.CheckedLocations = {}
 ---Supported since 0.25.2.
 ---@type integer[]
 Archipelago.MissingLocations = {}
+
+---The seed name of the connected room or nil if not connected.
+---Supported since v0.33.0
+---@type string?
+Archipelago.Seed = nil
 
 ---Add callback to be called when connecting to a (new) server and state should be cleared.
 ---@param name string identifier/name of this handler (for debugging)
@@ -506,6 +521,10 @@ LuaItem.Name = ""
 ---@type ImageRef?
 LuaItem.Icon = nil
 
+---Icon modifier, see JSON's img_mods. Only available in PopTracker, since 0.11.0.
+---@type string
+LuaItem.IconMods = ""
+
 ---Optional container to store item's state. Keys have to be string for `:Get` and `:Set` to work.
 ---@type table?
 LuaItem.ItemState = nil
@@ -548,7 +567,7 @@ LuaItem.OnMiddleClickFunc = nil
 ---@type fun(self:LuaItem):any
 LuaItem.SaveFunc = nil
 
----Callend when loading, data as returned by `SaveFunc`.
+---Called when loading, data as returned by `SaveFunc`.
 ---@type fun(self:LuaItem, data:any):nil
 LuaItem.LoadFunc = nil
 

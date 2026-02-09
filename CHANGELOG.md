@@ -1,5 +1,38 @@
 # PopTracker Changelog
 
+## v0.34.0-rc1
+
+* App Features
+  * Add zoom and pan support for maps
+  * Commandline: Properly sort multiple of the same pack by version for `--list-packs`
+  * Updated dependencies and bundled SSL
+* Pack Features
+  * LuaItem: trigger onChange for LuaItem.Set
+* Fixes
+  * SNES: avoid partial reads for watches
+  * Fix glow rendering slightly wrong (GPU) or horribly wrong (Software renderer)
+  * Trigger logic update when AvailableChestCount changes
+  * Properly load latest version of a pack when no version was specified or the version was not found
+
+## v0.33.0
+
+* App Features
+  * Better Unicode support
+  * Auto-updating on Windows
+  * Updated dependencies and bundled SSL
+  * Linux: Use a newer AppImage runtime that should be compatible with more Distributions
+  * Linux: Use faster compression for AppImage (updated appimagetool)
+* Pack Features
+  * Allow alpha component in Label text color
+  * Make `@disabled` filter configurable via `settings.json`
+  * Add Image filters `saturation`, `brightness`, `greyscale`, `dim`
+  * Archipelago: add .Seed
+* Fixes
+  * A bunch of typos
+  * Fix indirect connection detection for LuaItems
+  * Show correct error when moving a pack update download fails
+  * Some theoretical bugs in SNES auto-tracking (should not affect any real pack)
+
 ## v0.32.1
 
 * App Features

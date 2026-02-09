@@ -1,6 +1,7 @@
 #include "pack.h"
 #include "fileutil.h"
 #include "jsonutil.h"
+#include "version.h"
 #include <dirent.h>
 #include <stdlib.h>
 #include "sha256.h"
@@ -137,8 +138,8 @@ Pack::Pack(const fs::path& path) : _zip(nullptr), _path(path), _override(nullptr
         _name = to_string(_manifest,"name", _uid);
         _gameName = to_string(_manifest,"game_name", _name);
         _versionsURL = to_string(_manifest,"versions_url", "");
-        _minPopTrackerVersion = to_string(_manifest, "min_poptracker_version", "");
-        _targetPopTrackerVersion = to_string(_manifest, "target_poptracker_version", "");
+        _minPopTrackerVersion = Version{to_string(_manifest, "min_poptracker_version", "")};
+        _targetPopTrackerVersion = Version{to_string(_manifest, "target_poptracker_version", "")};
     }
 
     if (!_uid.empty()) {
@@ -320,6 +321,9 @@ void Pack::setVariant(const std::string& variant)
             }
         }
     }
+
+    const std::string filter = _settings.value("disabled_image_filter", "grey");
+    commasplit(filter, _disabledImageFilter);
 }
 
 std::string Pack::getPlatform() const
@@ -418,10 +422,7 @@ std::vector<Pack::Info> Pack::ListAvailable()
             return true;
         if (n>0)
             return false;
-        int m = strcasecmp(lhs.version.c_str(), rhs.version.c_str());
-        if (m<0)
-            return true;
-        return false;
+        return Version(lhs.version) < Version(rhs.version);
     });
 
     return res;
@@ -454,8 +455,7 @@ Pack::Info Pack::Find(const std::string& uid, const std::string& version, const 
     if (!packs.empty()) {
         // fall back to latest version since an upgrade may have removed it
         std::sort(packs.begin(), packs.end(), [](const Pack::Info& lhs, const Pack::Info& rhs) {
-            int m = strcasecmp(lhs.version.c_str(), rhs.version.c_str());
-            return (m<0);
+            return Version(lhs.version) < Version(rhs.version);
         });
         return packs.back();
     }

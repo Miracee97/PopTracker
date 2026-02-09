@@ -390,6 +390,10 @@ bool Tracker::AddLocations(const std::string& file) {
                 for (auto& sec : other.getSections()) {
                     sec.onChange -= this;
                     sec.onChange += {this,[this,&sec](void*) {
+                        // TODO: only touch caches and stale if sec's AvailableChestCount is involved in logic
+                        _providerCountCache.clear();
+                        _accessibilityStale = true;
+                        _visibilityStale = true;
                         if (_bulkUpdate)
                             _bulkSectionUpdates.push_back(sec.getFullID());
                         else
@@ -435,6 +439,10 @@ bool Tracker::AddLocations(const std::string& file) {
             if (!sec.getRef().empty())
                 _sectionNameRefs[sec.getRef()].push_back(sec.getFullID());
             sec.onChange += {this,[this,&sec](void*) {
+                // TODO: only touch caches and stale if sec's AvailableChestCount is involved in logic
+                _providerCountCache.clear();
+                _accessibilityStale = true;
+                _visibilityStale = true;
                 if (_bulkUpdate)
                     _bulkSectionUpdates.push_back(sec.getFullID());
                 else
@@ -545,10 +553,15 @@ int Tracker::ProviderCountForCode(const std::string& code)
 
     for (const auto& item : _luaItems)
     {
-        res += item.providesCode(code);
+        if (item.canProvideCode(code)) {
+            _luaCodesStack.emplace_back(code);
+            res += item.providesCode(code);
+            _luaCodesStack.pop_back();
+        }
     }
 
-    _providerCountCache[code] = res;
+    if (!_indirectlyConnectedLuaCodes.count(code))
+        _providerCountCache[code] = res;
     return res;
 }
 
@@ -1103,8 +1116,7 @@ LuaItem * Tracker::CreateLuaItem()
     i.onChange += {this, [this](void* sender) {
         const auto* i = static_cast<LuaItem*>(sender);
         if (!_updatingCache || !_itemChangesDuringCacheUpdate.count(i->getID())) {
-            if (!_bulkUpdate)
-                _providerCountCache.clear();
+            _providerCountCache.clear();
             _accessibilityStale = true;
             _visibilityStale = true;
             if (_updatingCache)
